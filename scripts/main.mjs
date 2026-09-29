@@ -11,8 +11,8 @@ const log = (...a) => console.log("Terrain Forge |", ...a);
 Hooks.once("init", () => {
   game.settings.register(MOD, "falKey", {
     name: "fal.ai API key",
-    hint: "Stored only in this browser (client setting). Get one at fal.ai → Dashboard → Keys. Only the GM needs it.",
-    scope: "client", config: true, type: String, default: ""
+    hint: "Saved on the server with your world so it survives reloads. Only GMs can change it, but players could technically read it from the browser console. Get one at fal.ai → Dashboard → Keys.",
+    scope: "world", config: true, restricted: true, type: String, default: ""
   });
   game.settings.register(MOD, "endpoint", {
     name: "Image endpoint",
@@ -27,7 +27,7 @@ Hooks.once("init", () => {
     name: "Campaign art style",
     hint: "Added to every prompt, so every map in the campaign shares one look. Change it once, not per map.",
     scope: "world", config: true, type: String,
-    default: "hand-painted fantasy battlemap, muted natural colours, soft ambient shadows, rich ground texture, consistent painterly detail"
+    default: "hand-painted top-down fantasy battle map, muted natural colours, soft ambient shadows, rich ground texture, consistent painterly detail"
   });
   game.settings.register(MOD, "gridDistance", {
     name: "Grid distance per square",

@@ -84,10 +84,12 @@ export function slugify(s) {
  */
 export function buildPrompt({ biome, features, style }) {
   const parts = [
-    "Top-down battlemap for a tabletop roleplaying game, seen from directly overhead, orthographic view with no perspective or horizon.",
+    "Flat top-down tactical battle map for a virtual tabletop, orthographic plan view.",
+    "The camera points straight down at the ground at exactly 90 degrees, like a satellite photo or a floor plan: no tilt, no isometric angle, no perspective, no horizon, no sky.",
+    "Everything is seen from directly above: trees appear only as round leafy canopies with no visible trunks, rocks and objects show only their top surfaces, nothing is seen from the side.",
     `Setting: ${biome.toLowerCase()}.`
   ];
-  if (features.length) parts.push(`The map contains: ${features.join("; ")}.`);
+  if (features.length) parts.push(`Seen from above, the map contains: ${features.join("; ")}.`);
   parts.push("Leave open, walkable ground between the features so figures can move around them.");
   parts.push("No grid lines, no text, no labels, no borders, no people, no creatures.");
   if (style?.trim()) parts.push(`Style: ${style.trim()}`);
