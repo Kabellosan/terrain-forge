@@ -81,6 +81,24 @@ export function stripHTML(html) {
   return String(html ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Visible text of an HTML string with common entities decoded, for comparisons. */
+export function plainText(html) {
+  return stripHTML(html).replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" }[e]));
+}
+
+/**
+ * Short fingerprint of a table's content: description plus each result's name
+ * and effect, in order. Compared as plain text so Foundry's HTML clean-up on
+ * save doesn't count as an edit. Pass either a table definition or
+ * { description, results: [{ name, effect }] } read back from Foundry.
+ */
+export function tableFingerprint({ description, results }) {
+  const text = [plainText(description), ...results.map((r) => `${plainText(r.name)}|${plainText(r.effect)}`)].join("\n");
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 export function escapeHTML(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -128,7 +146,7 @@ export function normalizeTableDefs(data) {
     });
     const rolls = Math.max(0, Math.min(10, Math.round(Number(t.rolls ?? 1)) || 0));
     return {
-      biome, category, hidden: !!t.hidden, rolls,
+      biome, category, hidden: !!t.hidden, rolls, folder: String(t.folder ?? "").trim(),
       blurb: String(t.blurb ?? "").trim(), setting: String(t.setting ?? "").trim(), results
     };
   });
@@ -136,6 +154,11 @@ export function normalizeTableDefs(data) {
 
 export function tableName(def) {
   return `${def.biome}: ${def.category}${def.hidden ? " (hidden)" : ""}`;
+}
+
+/** Fingerprint of a table definition, as it will read once written to Foundry. */
+export function defFingerprint(def) {
+  return tableFingerprint({ description: tableDescription(def), results: def.results });
 }
 
 export function tableDescription(def) {

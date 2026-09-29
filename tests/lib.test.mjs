@@ -19,7 +19,7 @@ const ps=L.buildPrompt({biome:"Magna Woods",setting:"an ancient oak forest",feat
 assert(ps.includes("Setting: an ancient oak forest.") && !ps.includes("magna"));
 // Table definitions: checked, tidied, and round-tripped through the description.
 const defs=L.normalizeTableDefs({tables:[{biome:" Vale ",category:"Cover",rolls:"2",setting:"a wood",results:[{name:"a log"}]}]});
-assert.deepEqual(defs[0],{biome:"Vale",category:"Cover",hidden:false,rolls:2,blurb:"",setting:"a wood",results:[{name:"a log",effect:""}]});
+assert.deepEqual(defs[0],{biome:"Vale",category:"Cover",hidden:false,rolls:2,folder:"",blurb:"",setting:"a wood",results:[{name:"a log",effect:""}]});
 assert.equal(L.parseRolls(L.stripHTML(L.tableDescription(defs[0]))),2);
 assert.equal(L.parseSetting(L.tableDescription(defs[0])),"a wood");
 assert.equal(L.tableName({biome:"Vale",category:"Traps",hidden:true}),"Vale: Traps (hidden)");

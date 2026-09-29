@@ -1,8 +1,12 @@
 import * as L from "./lib.mjs";
 import { STARTER_TABLES } from "./starter-tables.mjs";
+import { VALE_TABLES } from "./vale-tables.mjs";
 
 const MOD = "terrain-forge";
 const log = (...a) => console.log("Terrain Forge |", ...a);
+
+// Tables that ship with the module and install themselves (see syncBuiltinTables).
+const BUILTIN_TABLES = [...STARTER_TABLES, ...VALE_TABLES];
 
 /* ------------------------------------------------------------------ */
 /*  Settings                                                           */
@@ -39,6 +43,11 @@ Hooks.once("init", () => {
     hint: "Dragonbane uses 2 metres per square.",
     scope: "world", config: true, type: Number, default: 2
   });
+  game.settings.register(MOD, "autoTables", {
+    name: "Install built-in tables automatically",
+    hint: "On world load, adds the tables that ship with Terrain Forge (Forest, Cave, Misty Vale) and updates them when the module updates. Tables you've edited yourself are never overwritten. Untick to manage tables by hand.",
+    scope: "world", config: true, type: Boolean, default: true
+  });
   game.settings.register(MOD, "gridUnits", {
     name: "Grid units", scope: "world", config: true, type: String, default: "m"
   });
@@ -49,9 +58,13 @@ Hooks.once("ready", () => {
   mod.api = {
     open: (scene) => ForgeApp.open(scene),
     createStarterTables,
-    importTables
+    importTables,
+    syncBuiltinTables
   };
   log("ready — open with game.modules.get('terrain-forge').api.open()");
+  if (isActiveGM() && game.settings.get(MOD, "autoTables")) {
+    syncBuiltinTables().then((r) => { if (r?.made || r?.updated) ForgeApp.instance?.render(); });
+  }
 });
 
 // A "Terrain Forge" button in the Scenes sidebar, GM only.
@@ -84,6 +97,12 @@ const reforgeOption = {
 Hooks.on("getSceneContextOptions", (app, options) => options.push(reforgeOption));          // v13+
 Hooks.on("getSceneDirectoryEntryContext", (html, options) => options.push(reforgeOption)); // v12
 
+/** Only one GM does world-wide writes, so two GMs logging in don't both install tables. */
+function isActiveGM() {
+  const active = game.users?.activeGM;
+  return active ? active.id === game.user.id : !!game.user?.isGM;
+}
+
 function reportError(what, err) {
   console.error("Terrain Forge |", what, err);
   ui.notifications?.error(`Terrain Forge: ${what}. ${err?.message ?? err} (details in the F12 console)`);
@@ -108,8 +127,11 @@ function forgeTables() {
     if (!inForgeFolder(table.folder)) continue;
     const parsed = L.parseTableName(table.name);
     if (!parsed) continue;
+    // A biome folder inside a set folder ("Misty Vale/Magna Woods") groups it in the dropdown.
+    const parent = table.folder?.folder;
+    const group = parent && parent.name !== L.FORGE_FOLDER && inForgeFolder(parent) ? parent.name : "";
     out.push({
-      table, id: table.id, ...parsed,
+      table, id: table.id, ...parsed, group,
       rolls: L.parseRolls(L.stripHTML(table.description)),
       setting: L.parseSetting(table.description)
     });
@@ -142,29 +164,106 @@ async function ensureFolder(type, name = L.FORGE_FOLDER, parent = null) {
  * so saved scenes can still reroll from it).
  */
 async function writeTables(defs, { replace = false } = {}) {
-  const root = await ensureFolder("RollTable");
-  const resultType = CONST.TABLE_RESULT_TYPES?.TEXT ?? "text";
   let made = 0, updated = 0;
   for (const def of defs) {
-    const sub = await ensureFolder("RollTable", def.biome, root);
-    const name = L.tableName(def);
-    const data = { description: L.tableDescription(def), formula: `1d${def.results.length}` };
-    const results = def.results.map((r, i) => ({
-      type: resultType, name: r.name, description: r.effect, range: [i + 1, i + 1], weight: 1
-    }));
-    const existing = game.tables.find((t) => t.name === name && t.folder?.id === sub.id);
+    const sub = await biomeFolder(def);
+    const existing = game.tables.find((t) => t.name === L.tableName(def) && t.folder?.id === sub.id);
     if (existing) {
       if (!replace) continue;
-      await existing.update(data);
-      await existing.deleteEmbeddedDocuments("TableResult", existing.results.map((r) => r.id));
-      await existing.createEmbeddedDocuments("TableResult", results);
+      await rewriteTable(existing, def);
       updated++;
     } else {
-      await RollTable.create({ name, folder: sub.id, ...data, replacement: true, displayRoll: false, results });
+      await createTable(def, sub);
       made++;
     }
   }
   return { made, updated };
+}
+
+/** Terrain Forge / [set folder /] biome. */
+async function biomeFolder(def) {
+  let parent = await ensureFolder("RollTable");
+  if (def.folder) parent = await ensureFolder("RollTable", def.folder, parent);
+  return ensureFolder("RollTable", def.biome, parent);
+}
+
+function tableData(def) {
+  const resultType = CONST.TABLE_RESULT_TYPES?.TEXT ?? "text";
+  return {
+    description: L.tableDescription(def),
+    formula: `1d${def.results.length}`,
+    results: def.results.map((r, i) => ({
+      type: resultType, name: r.name, description: r.effect, range: [i + 1, i + 1], weight: 1
+    }))
+  };
+}
+
+async function createTable(def, folder, flags = {}) {
+  return RollTable.create({ name: L.tableName(def), folder: folder.id, ...tableData(def), replacement: true, displayRoll: false, flags });
+}
+
+/** Replace a table's description and results in place, keeping its id. */
+async function rewriteTable(table, def, flags = {}) {
+  const { results, ...data } = tableData(def);
+  await table.update({ ...data, flags });
+  await table.deleteEmbeddedDocuments("TableResult", table.results.map((r) => r.id));
+  await table.createEmbeddedDocuments("TableResult", results);
+}
+
+/** Fingerprint of a table as it currently stands in the world. */
+function currentFingerprint(table) {
+  const results = [...table.results].sort((a, b) => (a.range?.[0] ?? 0) - (b.range?.[0] ?? 0));
+  return L.tableFingerprint({
+    description: table.description,
+    results: results.map((r) => ({ name: r.name ?? r.text, effect: r.description }))
+  });
+}
+
+/**
+ * Install the tables that ship with the module and keep them current.
+ * Each installed table remembers the fingerprint it was written with:
+ * - missing → created;
+ * - still exactly as installed, but the module has a newer version → updated;
+ * - changed by the GM since → left alone (their edits win);
+ * - an unflagged table with the same name (made by hand or imported) is adopted
+ *   only if its content already matches, otherwise left alone.
+ * Tables are found by name anywhere under the Terrain Forge folder, so moving one is fine.
+ */
+async function syncBuiltinTables() {
+  let made = 0, updated = 0;
+  const kept = [];
+  try {
+    for (const def of L.normalizeTableDefs(BUILTIN_TABLES)) {
+      const name = L.tableName(def);
+      const want = L.defFingerprint(def);
+      const flags = { [MOD]: { builtin: want } };
+      const existing = game.tables.find((t) => t.name === name && inForgeFolder(t.folder));
+      if (!existing) {
+        await createTable(def, await biomeFolder(def), flags);
+        made++;
+        continue;
+      }
+      const installed = existing.flags?.[MOD]?.builtin;
+      if (installed === want) continue;
+      const now = currentFingerprint(existing);
+      if (now === want) { await existing.update({ flags }); continue; }
+      if (installed && now === installed) {
+        await rewriteTable(existing, def, flags);
+        updated++;
+      } else {
+        kept.push(name);
+      }
+    }
+    if (kept.length) log("left alone because they've been edited (or were made by hand):", kept.join(", "));
+    if (made || updated) {
+      const bits = [made && `${made} new table${made === 1 ? "" : "s"}`, updated && `${updated} updated`].filter(Boolean);
+      ui.notifications.info(`Terrain Forge: built-in tables: ${bits.join(", ")}.`);
+    }
+    return { made, updated, kept };
+  } catch (err) {
+    reportError("could not install the built-in tables", err);
+    return null;
+  }
 }
 
 async function createStarterTables() {
@@ -445,6 +544,8 @@ class ForgeApp extends ApplicationV2 {
     const s = this.tf;
     const tables = this.tables;
     const biomes = [...new Set(tables.map((t) => t.biome))].sort();
+    const groupOf = new Map(tables.map((t) => [t.biome, t.group]));
+    const groups = [...new Set(biomes.map((b) => groupOf.get(b)))].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b));
     if (!biomes.length) {
       return `<section class="tf-empty">
         <p>No forge tables found. Tables live in the <strong>${L.FORGE_FOLDER}</strong> folder and are named <code>Biome: Category</code>. Add <code>(hidden)</code> to keep a table out of the image prompt.</p>
@@ -488,7 +589,10 @@ class ForgeApp extends ApplicationV2 {
     return `
       ${banner}
       <div class="tf-grid">
-        <label>Biome <select data-field="biome">${biomes.map((b) => opt(b, b, s.biome)).join("")}</select></label>
+        <label>Biome <select data-field="biome">${groups.map((g) => {
+          const items = biomes.filter((b) => groupOf.get(b) === g).map((b) => opt(b, b, s.biome)).join("");
+          return g ? `<optgroup label="${L.escapeHTML(g)}">${items}</optgroup>` : items;
+        }).join("")}</select></label>
         <label>Size <select data-field="size">
           ${Object.entries(L.SIZE_PRESETS).map(([k, p]) => opt(k, p.label, s.size)).join("")}
           ${opt("custom", "Custom", s.size)}

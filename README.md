@@ -2,7 +2,7 @@
 
 Roll biome tables → get an AI-painted battlemap as a ready Foundry scene → get a GM journal listing every feature and its Dragonbane effect. Hidden hazards never go into the image; you place them as GM-only markers.
 
-Works on Foundry v13 and v14. System-agnostic, starter tables written for Dragonbane.
+Works on Foundry v13 and v14. System-agnostic, starter tables written for Dragonbane, plus tables for the Misty Vale of *The Secret of the Dragon Emperor*.
 
 ## Install
 
@@ -14,7 +14,7 @@ Works on Foundry v13 and v14. System-agnostic, starter tables written for Dragon
 ## Use
 
 1. Scenes sidebar → **Terrain Forge** button (or macro: `game.modules.get("terrain-forge").api.open()`).
-2. First time: click **Create starter tables** (Forest and Cave).
+2. The built-in tables install themselves when the world loads (see below).
 3. Pick biome and size, set rolls per table, **Roll**. Reroll or drop any line. Tweak the prompt if you like.
 4. **Forge scene**. After 10–40 seconds you get:
    - a new scene in the *Terrain Forge* scene folder, gridded at 2 m per square, fully lit, no walls
@@ -30,6 +30,17 @@ Every forged scene remembers its biome, rolls, prompt and model.
 - Right-click a forged scene in the Scenes sidebar → **Reforge with Terrain Forge**, or open the dialog while viewing it and click **Load rolls and prompt from the current scene**.
 - Tick **Replace this scene's map** to swap the image on the same scene (tokens, markers and journal stay; the journal is updated). Untick it to forge a separate new scene.
 - Closing the dialog keeps your current rolls and prompt; **New** starts fresh.
+
+## Built-in tables
+
+When a GM loads the world, Terrain Forge adds the tables that ship with it into the *Terrain Forge* table folder:
+
+- **Forest** and **Cave**: generic starter biomes.
+- **Misty Vale → Magna Woods**: for *The Secret of the Dragon Emperor*. The other Vale regions are on the way.
+
+When the module updates, built-in tables you haven't touched update too. **If you edit a built-in table, it's yours**: Terrain Forge never overwrites it again. To get the shipped version back, delete the table and reload the world. To manage all tables by hand, untick *Install built-in tables automatically* in the settings.
+
+A biome folder inside another folder (like *Misty Vale/Magna Woods*) shows up grouped in the biome dropdown.
 
 ## Your own tables
 

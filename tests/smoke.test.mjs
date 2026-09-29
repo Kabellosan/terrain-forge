@@ -15,7 +15,7 @@ class ApplicationV2 {
 }
 globalThis.foundry = { applications: { api: { ApplicationV2 } }, utils: { deepClone: (x) => structuredClone(x) } };
 const folder = { name: "Terrain Forge", folder: null };
-const mkTable = (id, name, results) => ({ id, name, folder, description: "<p>Rolls: 1</p>", roll: async () => ({ results: [results[Math.floor(Math.random() * results.length)]] }) });
+const mkTable = (id, name, results) => ({ id, name, folder, results, description: "<p>Rolls: 1</p>", roll: async () => ({ results: [results[Math.floor(Math.random() * results.length)]] }) });
 const tables = [
   mkTable("t1", "Forest: Cover", [{ name: "a fallen oak", description: "Cover." }]),
   mkTable("t2", "Forest: Hazards (hidden)", [{ name: "Snare", description: "Trap." }])
@@ -39,9 +39,10 @@ globalThis.game = {
   folders,
   settings: { register: (m, k, o) => (settings[k] = o.default), get: (m, k) => settings[k] },
   modules: new Map([["terrain-forge", {}]]),
-  user: { isGM: true }, tables, scenes: { get: (id) => (id === "s1" ? scene : null) }
+  user: { id: "me", isGM: true }, users: { activeGM: { id: "other-gm" } }, tables, scenes: { get: (id) => (id === "s1" ? scene : null) }
 };
 globalThis.canvas = { scene };
+const { VALE_TABLES } = await import("../scripts/vale-tables.mjs");
 await import("../scripts/main.mjs");
 hooks.init.forEach((f) => f()); hooks.ready.forEach((f) => f());
 const api = game.modules.get("terrain-forge").api;
@@ -72,5 +73,24 @@ if (!again.tf.prompt.includes("Setting: an ancient oak forest.") || !again.tf.pr
 const errCount = errors.length;
 if ((await api.importTables("{ nope")) !== null || errors.length !== errCount + 1) throw new Error("bad JSON not reported");
 errors.length = errCount;
+// Built-in tables: install, stay put, update when unedited, never clobber edits.
+const sync1 = await api.syncBuiltinTables();
+const magna = tables.find((t) => t.name === "Magna Woods: Terrain");
+if (!magna || magna.folder?.name !== "Magna Woods" || magna.folder.folder?.name !== "Misty Vale") throw new Error("Vale table not in Misty Vale/Magna Woods");
+if (!sync1.kept.includes("Forest: Cover") || tables.filter((t) => t.name === "Forest: Cover").length !== 1) throw new Error("hand-made table not left alone");
+if (sync1.made !== tables.filter((t) => t.flags?.["terrain-forge"]?.builtin).length) throw new Error("installed tables not flagged");
+const sync2 = await api.syncBuiltinTables();
+if (sync2.made || sync2.updated) throw new Error("second sync was not a no-op");
+VALE_TABLES[0].results[0].effect = "Open ground. Changed upstream.";
+const sync3 = await api.syncBuiltinTables();
+if (sync3.updated !== 1 || magna.results[0].description !== "Open ground. Changed upstream.") throw new Error("unedited table not updated");
+magna.results[1].name = "the GM's own road";
+VALE_TABLES[0].results[0].effect = "Open ground. Changed again.";
+const sync4 = await api.syncBuiltinTables();
+if (sync4.updated || !sync4.kept.includes("Magna Woods: Terrain") || magna.results[1].name !== "the GM's own road") throw new Error("GM edit was overwritten");
+again.tf.biome = "Magna Woods"; again.tf.counts = {};
+await Forge.onRoll.call(again); await again.render();
+if (!again.tf.prompt.includes("Setting: an ancient old-growth forest") || /magna/i.test(again.tf.prompt)) throw new Error("Vale prompt wrong: " + again.tf.prompt);
+if (!again.lastHTML.includes('<optgroup label="Misty Vale">')) throw new Error("Misty Vale group missing from dropdown");
 if (errors.length) throw new Error("errors: " + errors.join(" | "));
-console.log("smoke test passes: open, roll, hidden-stays-out, remember, reforge-load, fresh, import, re-import, setting");
+console.log("smoke test passes: open, roll, hidden-stays-out, remember, reforge-load, fresh, import, re-import, setting, builtin install/update/keep-edits, grouped biomes");
