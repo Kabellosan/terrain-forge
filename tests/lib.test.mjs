@@ -11,4 +11,21 @@ const p=L.buildPrompt({biome:"Forest",features:["a fallen oak","a shrine"],style
 console.log(p); assert(!p.includes("Snare"));
 for (const t of STARTER_TABLES){ const n=`${t.biome}: ${t.category}${t.hidden?" (hidden)":""}`; const pr=L.parseTableName(n); assert.equal(pr.hidden,t.hidden); assert(t.results.every(r=>r.name&&r.effect)); }
 console.log("tables", STARTER_TABLES.length, "results", STARTER_TABLES.reduce((a,t)=>a+t.results.length,0));
+// Setting line: a named biome reaches the model as a paintable description.
+assert.equal(L.parseSetting("<p>Rolls: 1</p><p>Setting: an ancient oak forest.</p>"),"an ancient oak forest");
+assert.equal(L.parseSetting("<p>Setting: the woodcutter&#39;s wood</p>"),"the woodcutter's wood");
+assert.equal(L.parseSetting("<p>Rolls: 2</p>"),"");
+const ps=L.buildPrompt({biome:"Magna Woods",setting:"an ancient oak forest",features:[],style:""});
+assert(ps.includes("Setting: an ancient oak forest.") && !ps.includes("magna"));
+// Table definitions: checked, tidied, and round-tripped through the description.
+const defs=L.normalizeTableDefs({tables:[{biome:" Vale ",category:"Cover",rolls:"2",setting:"a wood",results:[{name:"a log"}]}]});
+assert.deepEqual(defs[0],{biome:"Vale",category:"Cover",hidden:false,rolls:2,blurb:"",setting:"a wood",results:[{name:"a log",effect:""}]});
+assert.equal(L.parseRolls(L.stripHTML(L.tableDescription(defs[0]))),2);
+assert.equal(L.parseSetting(L.tableDescription(defs[0])),"a wood");
+assert.equal(L.tableName({biome:"Vale",category:"Traps",hidden:true}),"Vale: Traps (hidden)");
+assert.throws(()=>L.normalizeTableDefs({}),/list of tables/);
+assert.throws(()=>L.normalizeTableDefs([{biome:"A:B",category:"C",results:[{name:"x"}]}]),/can't contain/);
+assert.throws(()=>L.normalizeTableDefs([{biome:"A",category:"C",results:[]}]),/no results/);
+assert.throws(()=>L.normalizeTableDefs([{biome:"A",category:"C",results:[{effect:"x"}]}]),/result 1 has no name/);
+assert.equal(L.normalizeTableDefs(STARTER_TABLES).length,STARTER_TABLES.length);
 console.log("all tests pass");

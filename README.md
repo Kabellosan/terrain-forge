@@ -40,7 +40,24 @@ Any RollTable inside the **Terrain Forge** folder (any subfolder) named `Biome: 
 - Add `(hidden)` to the table name (`Swamp: Traps (hidden)`) to keep it out of the prompt.
 - Put `Rolls: 2` in the table description to set the default number of rolls.
 
+- Put `Setting: …` in a table description to describe the biome to the image model (e.g. `Setting: an ancient old-growth forest of oak and beech crowns`). Handy when the biome is named after a place the model has never heard of. Without it, the biome name is used.
+
 New biome = new tables with a new biome name. That's it.
+
+## Importing tables from a file
+
+**Import tables…** in the dialog (or `game.modules.get("terrain-forge").api.importTables(json)`) loads a JSON file of tables in the same shape as `scripts/starter-tables.mjs`:
+
+```json
+{ "tables": [
+  { "biome": "Swamp", "category": "Cover", "rolls": 2, "hidden": false,
+    "setting": "a misty reed swamp of black pools and hummocks",
+    "blurb": "Things to hide behind.",
+    "results": [ { "name": "a half-sunk rowboat", "effect": "Cover. Rough terrain around it." } ] }
+] }
+```
+
+Importing the same file again updates those tables in place, so you can edit the file and re-import.
 
 ## Cost
 

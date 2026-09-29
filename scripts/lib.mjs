@@ -59,6 +59,18 @@ export function parseTableName(name) {
   return { biome: m[1], category, hidden };
 }
 
+/**
+ * Read "Setting: …" from a table description (raw HTML): how the biome is
+ * described to the image model. Lets a biome named after a place ("Magna Woods")
+ * still reach the model as something it can paint. Empty string if absent.
+ */
+export function parseSetting(html) {
+  const m = /setting\s*:\s*([^<\n]+)/i.exec(String(html ?? ""));
+  if (!m) return "";
+  const text = m[1].replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (_, e) => ({ nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" }[e]));
+  return text.trim().replace(/\.+$/, "");
+}
+
 /** Read "Rolls: N" from a table description. Defaults to 1. */
 export function parseRolls(text) {
   const m = /rolls?\s*[:=]\s*(\d+)/i.exec(text ?? "");
@@ -84,15 +96,54 @@ export const DEFAULT_FRAMING = "Flat top-down tactical battle map for a virtual 
  * Build the image prompt from the visible rolled features only.
  * Hidden results never reach the prompt, so traps are never painted.
  */
-export function buildPrompt({ biome, features, style, framing = DEFAULT_FRAMING }) {
+export function buildPrompt({ biome, setting = "", features, style, framing = DEFAULT_FRAMING }) {
   const parts = [];
   if (framing?.trim()) parts.push(framing.trim());
-  parts.push(`Setting: ${biome.toLowerCase()}.`);
+  parts.push(`Setting: ${setting?.trim() || biome.toLowerCase()}.`);
   if (features.length) parts.push(`Seen from above, the map contains: ${features.join("; ")}.`);
   parts.push("Leave open, walkable ground between the features so figures can move around them.");
   parts.push("No grid lines, no text, no labels, no borders, no people, no creatures.");
   if (style?.trim()) parts.push(`Style: ${style.trim()}`);
   return parts.join(" ");
+}
+
+/**
+ * Check and tidy table definitions from a starter list or an imported JSON file.
+ * Accepts an array or { tables: [...] }. Throws a readable error on the first problem.
+ */
+export function normalizeTableDefs(data) {
+  const list = Array.isArray(data) ? data : data?.tables;
+  if (!Array.isArray(list) || !list.length) throw new Error('Expected a list of tables, or { "tables": [...] }.');
+  return list.map((t, i) => {
+    const biome = String(t?.biome ?? "").trim();
+    const category = String(t?.category ?? "").trim();
+    const where = `Table ${i + 1}${biome ? ` (${biome}: ${category || "?"})` : ""}`;
+    if (!biome || !category) throw new Error(`${where} needs a biome and a category.`);
+    if (/[:|]/.test(biome)) throw new Error(`${where}: the biome name can't contain ":" or "|".`);
+    if (!Array.isArray(t.results) || !t.results.length) throw new Error(`${where} has no results.`);
+    const results = t.results.map((r, j) => {
+      const name = String(r?.name ?? "").trim();
+      if (!name) throw new Error(`${where}, result ${j + 1} has no name.`);
+      return { name, effect: String(r?.effect ?? "").trim() };
+    });
+    const rolls = Math.max(0, Math.min(10, Math.round(Number(t.rolls ?? 1)) || 0));
+    return {
+      biome, category, hidden: !!t.hidden, rolls,
+      blurb: String(t.blurb ?? "").trim(), setting: String(t.setting ?? "").trim(), results
+    };
+  });
+}
+
+export function tableName(def) {
+  return `${def.biome}: ${def.category}${def.hidden ? " (hidden)" : ""}`;
+}
+
+export function tableDescription(def) {
+  return [
+    `<p>Rolls: ${def.rolls}</p>`,
+    def.setting ? `<p>Setting: ${escapeHTML(def.setting)}</p>` : "",
+    def.blurb ? `<p>${escapeHTML(def.blurb)}</p>` : ""
+  ].join("");
 }
 
 /** HTML for the GM journal page that goes with each forged scene. */

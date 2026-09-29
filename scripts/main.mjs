@@ -48,7 +48,8 @@ Hooks.once("ready", () => {
   const mod = game.modules.get(MOD);
   mod.api = {
     open: (scene) => ForgeApp.open(scene),
-    createStarterTables
+    createStarterTables,
+    importTables
   };
   log("ready — open with game.modules.get('terrain-forge').api.open()");
 });
@@ -107,7 +108,11 @@ function forgeTables() {
     if (!inForgeFolder(table.folder)) continue;
     const parsed = L.parseTableName(table.name);
     if (!parsed) continue;
-    out.push({ table, id: table.id, ...parsed, rolls: L.parseRolls(L.stripHTML(table.description)) });
+    out.push({
+      table, id: table.id, ...parsed,
+      rolls: L.parseRolls(L.stripHTML(table.description)),
+      setting: L.parseSetting(table.description)
+    });
   }
   return out.sort((a, b) => Number(a.hidden) - Number(b.hidden) || a.category.localeCompare(b.category));
 }
@@ -131,28 +136,71 @@ async function ensureFolder(type, name = L.FORGE_FOLDER, parent = null) {
   return existing ?? Folder.create({ name, type, folder: parent?.id ?? null });
 }
 
-async function createStarterTables() {
+/**
+ * Create tables from definitions, one subfolder per biome. An existing table
+ * with the same name is skipped, or with `replace` rewritten in place (same id,
+ * so saved scenes can still reroll from it).
+ */
+async function writeTables(defs, { replace = false } = {}) {
   const root = await ensureFolder("RollTable");
   const resultType = CONST.TABLE_RESULT_TYPES?.TEXT ?? "text";
-  let made = 0;
-  for (const def of STARTER_TABLES) {
+  let made = 0, updated = 0;
+  for (const def of defs) {
     const sub = await ensureFolder("RollTable", def.biome, root);
-    const name = `${def.biome}: ${def.category}${def.hidden ? " (hidden)" : ""}`;
-    if (game.tables.find((t) => t.name === name && t.folder?.id === sub.id)) continue;
-    await RollTable.create({
-      name,
-      folder: sub.id,
-      description: `<p>Rolls: ${def.rolls}</p><p>${L.escapeHTML(def.blurb)}</p>`,
-      formula: `1d${def.results.length}`,
-      replacement: true,
-      displayRoll: false,
-      results: def.results.map((r, i) => ({
-        type: resultType, name: r.name, description: r.effect, range: [i + 1, i + 1], weight: 1
-      }))
-    });
-    made++;
+    const name = L.tableName(def);
+    const data = { description: L.tableDescription(def), formula: `1d${def.results.length}` };
+    const results = def.results.map((r, i) => ({
+      type: resultType, name: r.name, description: r.effect, range: [i + 1, i + 1], weight: 1
+    }));
+    const existing = game.tables.find((t) => t.name === name && t.folder?.id === sub.id);
+    if (existing) {
+      if (!replace) continue;
+      await existing.update(data);
+      await existing.deleteEmbeddedDocuments("TableResult", existing.results.map((r) => r.id));
+      await existing.createEmbeddedDocuments("TableResult", results);
+      updated++;
+    } else {
+      await RollTable.create({ name, folder: sub.id, ...data, replacement: true, displayRoll: false, results });
+      made++;
+    }
   }
+  return { made, updated };
+}
+
+async function createStarterTables() {
+  const { made } = await writeTables(L.normalizeTableDefs(STARTER_TABLES));
   ui.notifications.info(`Terrain Forge: created ${made} starter table${made === 1 ? "" : "s"}.`);
+}
+
+/**
+ * Import tables from JSON (a string, an array, or { tables: [...] }), in the
+ * same shape as the starter tables. Re-importing updates tables in place.
+ */
+async function importTables(data) {
+  try {
+    const defs = L.normalizeTableDefs(typeof data === "string" ? JSON.parse(data) : data);
+    const { made, updated } = await writeTables(defs, { replace: true });
+    const biomes = [...new Set(defs.map((d) => d.biome))].join(", ");
+    ui.notifications.info(`Terrain Forge: ${biomes}: ${made} new table${made === 1 ? "" : "s"}, ${updated} updated.`);
+    return { made, updated };
+  } catch (err) {
+    reportError("could not import tables", err);
+    return null;
+  }
+}
+
+/** Let the GM pick a .json file and import it. */
+function pickTableFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      resolve(file ? await importTables(await file.text()) : null);
+    });
+    input.click();
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -345,6 +393,7 @@ class ForgeApp extends ApplicationV2 {
       rebuild: ForgeApp.onRebuild,
       forge: ForgeApp.onForge,
       starter: ForgeApp.onStarter,
+      importFile: ForgeApp.onImportFile,
       loadCurrent: ForgeApp.onLoadCurrent,
       fresh: ForgeApp.onFresh
     }
@@ -400,6 +449,7 @@ class ForgeApp extends ApplicationV2 {
       return `<section class="tf-empty">
         <p>No forge tables found. Tables live in the <strong>${L.FORGE_FOLDER}</strong> folder and are named <code>Biome: Category</code>. Add <code>(hidden)</code> to keep a table out of the image prompt.</p>
         <button type="button" data-action="starter"><i class="fa-solid fa-seedling"></i> Create starter tables (Forest &amp; Cave)</button>
+        <button type="button" data-action="importFile"><i class="fa-solid fa-file-import"></i> Import tables from a JSON file</button>
       </section>`;
     }
     if (!biomes.includes(s.biome)) s.biome = biomes[0];
@@ -447,6 +497,7 @@ class ForgeApp extends ApplicationV2 {
           <label>Width <input type="number" min="4" max="${L.MAX_SQUARES}" data-field="w" value="${s.w}"></label>
           <label>Height <input type="number" min="4" max="${L.MAX_SQUARES}" data-field="h" value="${s.h}"></label>` : ""}
       </div>
+      <a class="tf-link" data-action="importFile" title="Add or update tables from a JSON file"><i class="fa-solid fa-file-import"></i> Import tables…</a>
 
       <fieldset class="tf-counts"><legend>Rolls per table</legend>
         ${cats.map((t) => `<label>${L.escapeHTML(t.category)}${t.hidden ? ' <i class="fa-solid fa-eye-slash"></i>' : ""}
@@ -502,6 +553,7 @@ class ForgeApp extends ApplicationV2 {
     const s = this.tf;
     s.prompt = L.buildPrompt({
       biome: s.biome,
+      setting: this.tables.find((t) => t.biome === s.biome && t.setting)?.setting,
       features: s.rolled.filter((r) => !r.hidden).map((r) => r.name),
       style: game.settings.get(MOD, "style"),
       framing: game.settings.get(MOD, "framing") || L.DEFAULT_FRAMING
@@ -545,6 +597,8 @@ class ForgeApp extends ApplicationV2 {
   static onRebuild() { this.rebuildPrompt(); this.render(); }
 
   static async onStarter() { await createStarterTables(); this.render(); }
+
+  static async onImportFile() { if (await pickTableFile()) this.render(); }
 
   static onLoadCurrent() {
     if (!canvas.scene) return;
