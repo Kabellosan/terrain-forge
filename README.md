@@ -2,7 +2,7 @@
 
 Roll biome tables → get an AI-painted battlemap as a ready Foundry scene → get a GM journal listing every feature and its Dragonbane effect. Hidden hazards never go into the image; you place them as GM-only markers.
 
-Works on Foundry v13 and v14. System-agnostic, starter tables written for Dragonbane, plus tables for the Misty Vale of *The Secret of the Dragon Emperor*.
+Works on Foundry v13 and v14. System-agnostic, starter tables written for Dragonbane. Campaign tables can load from a private link (see *Private tables*).
 
 ## Install
 
@@ -33,12 +33,19 @@ Every forged scene remembers its biome, rolls, prompt and model.
 
 ## Built-in tables
 
-When a GM loads the world, Terrain Forge adds the tables that ship with it into the *Terrain Forge* table folder:
+When a GM loads the world, Terrain Forge adds the generic **Forest** and **Cave** tables into the *Terrain Forge* table folder, plus any tables from your private tables link.
 
-- **Forest** and **Cave**: generic starter biomes.
-- **Misty Vale → Magna Woods**: for *The Secret of the Dragon Emperor*. The other Vale regions are on the way.
+When the module or your private tables change, tables you haven't touched update too. **If you edit a built-in table, it's yours**: Terrain Forge never overwrites it again. To get the shipped version back, delete the table and reload the world. To manage all tables by hand, untick *Install built-in tables automatically* in the settings.
 
-When the module updates, built-in tables you haven't touched update too. **If you edit a built-in table, it's yours**: Terrain Forge never overwrites it again. To get the shipped version back, delete the table and reload the world. To manage all tables by hand, untick *Install built-in tables automatically* in the settings.
+## Private tables
+
+Tables based on a published campaign shouldn't go in a public module. Keep them in a **secret GitHub gist** instead:
+
+1. Make a secret gist with one or more `.json` files, each in the import format below. Add `"folder": "Misty Vale"` to a table to group its biomes.
+2. Paste the gist's page link into *Configure Settings → Terrain Forge → Private tables link*.
+3. Reload the world. The tables install and stay in sync from then on, same rules as the built-in ones.
+
+A secret gist is unlisted, not locked: anyone with the link can read it, and players could find the link in the browser console. Fine for a home game. Any other URL that serves the JSON works too.
 
 A biome folder inside another folder (like *Misty Vale/Magna Woods*) shows up grouped in the biome dropdown.
 

@@ -28,4 +28,9 @@ assert.throws(()=>L.normalizeTableDefs([{biome:"A:B",category:"C",results:[{name
 assert.throws(()=>L.normalizeTableDefs([{biome:"A",category:"C",results:[]}]),/no results/);
 assert.throws(()=>L.normalizeTableDefs([{biome:"A",category:"C",results:[{effect:"x"}]}]),/result 1 has no name/);
 assert.equal(L.normalizeTableDefs(STARTER_TABLES).length,STARTER_TABLES.length);
+assert.equal(L.gistId("https://gist.github.com/Kabellosan/aeee2777f3917151ed9d4580c4fdc578"),"aeee2777f3917151ed9d4580c4fdc578");
+assert.equal(L.gistId(" https://gist.github.com/aeee2777f3917151ed9d4580c4fdc578/ "),"aeee2777f3917151ed9d4580c4fdc578");
+assert.equal(L.gistId("https://gist.githubusercontent.com/Kabellosan/aeee2777f3917151ed9d4580c4fdc578/raw/x.json"),null);
+assert.equal(L.gistId("https://example.com/tables.json"),null);
+assert(L.isEmptyTableList([]) && L.isEmptyTableList({tables:[]}) && !L.isEmptyTableList({}));
 console.log("all tests pass");

@@ -152,6 +152,18 @@ export function normalizeTableDefs(data) {
   });
 }
 
+/** The id of a gist page link ("https://gist.github.com/user/abc123…"), or null for any other URL. */
+export function gistId(url) {
+  const m = /^https?:\/\/gist\.github\.com\/(?:[\w-]+\/)?([0-9a-f]{20,})\/?(?:[#?].*)?$/i.exec(String(url ?? "").trim());
+  return m ? m[1] : null;
+}
+
+/** True for an empty table list ([] or { tables: [] }), e.g. a placeholder file. */
+export function isEmptyTableList(data) {
+  const list = Array.isArray(data) ? data : data?.tables;
+  return Array.isArray(list) && list.length === 0;
+}
+
 export function tableName(def) {
   return `${def.biome}: ${def.category}${def.hidden ? " (hidden)" : ""}`;
 }

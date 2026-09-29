@@ -1,12 +1,12 @@
 import * as L from "./lib.mjs";
 import { STARTER_TABLES } from "./starter-tables.mjs";
-import { VALE_TABLES } from "./vale-tables.mjs";
 
 const MOD = "terrain-forge";
 const log = (...a) => console.log("Terrain Forge |", ...a);
 
 // Tables that ship with the module and install themselves (see syncBuiltinTables).
-const BUILTIN_TABLES = [...STARTER_TABLES, ...VALE_TABLES];
+// Campaign tables that must stay private come from the "privateTables" link instead.
+const BUILTIN_TABLES = STARTER_TABLES;
 
 /* ------------------------------------------------------------------ */
 /*  Settings                                                           */
@@ -45,8 +45,13 @@ Hooks.once("init", () => {
   });
   game.settings.register(MOD, "autoTables", {
     name: "Install built-in tables automatically",
-    hint: "On world load, adds the tables that ship with Terrain Forge (Forest, Cave, Misty Vale) and updates them when the module updates. Tables you've edited yourself are never overwritten. Untick to manage tables by hand.",
+    hint: "On world load, adds the tables that ship with Terrain Forge (Forest, Cave) and those from your private tables link, and updates them when they change. Tables you've edited yourself are never overwritten. Untick to manage tables by hand.",
     scope: "world", config: true, type: Boolean, default: true
+  });
+  game.settings.register(MOD, "privateTables", {
+    name: "Private tables link",
+    hint: "A secret GitHub gist (paste the gist page link) or any URL serving table JSON. Every .json file in the gist is loaded on world load, so campaign tables never go in the public module. Players could read this link from the browser console.",
+    scope: "world", config: true, restricted: true, type: String, default: ""
   });
   game.settings.register(MOD, "gridUnits", {
     name: "Grid units", scope: "world", config: true, type: String, default: "m"
@@ -220,6 +225,47 @@ function currentFingerprint(table) {
 }
 
 /**
+ * Table definitions from the private tables link: every .json file of a gist
+ * (read through GitHub's API, which browsers may call and which is never stale),
+ * or a single JSON document at any other URL. A broken file is reported and
+ * skipped; the rest still load.
+ */
+async function fetchPrivateTables() {
+  const url = game.settings.get(MOD, "privateTables")?.trim();
+  if (!url) return [];
+  const files = [];
+  try {
+    const id = L.gistId(url);
+    if (id) {
+      const res = await fetch(`https://api.github.com/gists/${id}`, { headers: { Accept: "application/vnd.github+json" } });
+      if (!res.ok) throw new Error(`GitHub answered ${res.status} for the private tables gist. Check the link in settings.`);
+      const gist = await res.json();
+      for (const f of Object.values(gist.files ?? {}).sort((a, b) => a.filename.localeCompare(b.filename))) {
+        if (!f.filename.toLowerCase().endsWith(".json")) continue;
+        files.push({ name: f.filename, text: f.truncated ? await (await fetch(f.raw_url)).text() : f.content });
+      }
+    } else {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`the private tables link answered ${res.status}.`);
+      files.push({ name: url, text: await res.text() });
+    }
+  } catch (err) {
+    reportError("could not load the private tables", err);
+    return [];
+  }
+  const defs = [];
+  for (const f of files) {
+    try {
+      const data = JSON.parse(f.text);
+      if (!L.isEmptyTableList(data)) defs.push(...L.normalizeTableDefs(data));
+    } catch (err) {
+      reportError(`skipped private tables file ${f.name}`, err);
+    }
+  }
+  return defs;
+}
+
+/**
  * Install the tables that ship with the module and keep them current.
  * Each installed table remembers the fingerprint it was written with:
  * - missing → created;
@@ -233,7 +279,8 @@ async function syncBuiltinTables() {
   let made = 0, updated = 0;
   const kept = [];
   try {
-    for (const def of L.normalizeTableDefs(BUILTIN_TABLES)) {
+    const defs = [...L.normalizeTableDefs(BUILTIN_TABLES), ...(await fetchPrivateTables())];
+    for (const def of defs) {
       const name = L.tableName(def);
       const want = L.defFingerprint(def);
       const flags = { [MOD]: { builtin: want } };

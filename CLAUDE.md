@@ -11,15 +11,14 @@ Foundry VTT module for Captain's Dragonbane campaign. Roll biome tables → buil
 - **fal.ai (FLUX.2)** for images. The Claude API can't generate images. Flash ≈1.5¢/map, pro ≈6–8¢.
 - **Table results are written as seen from above** (result name = prompt fragment, description = Dragonbane effect). Side-view words ("trunks", "doors", "tall") make FLUX tilt the camera.
 - **A biome's `Setting:` line is what the image model sees**, not the biome name. Place names ("Magna Woods") mean nothing to FLUX. Keep the setting line neutral; biome flavour like blight or mist goes in individual results, so it only appears when rolled, never on every map.
-- **Book text stays private; original tables ship.** The repo is public. Free League text (primers, book excerpts, boxed text, paraphrased entries) must NOT be committed; source material goes in `private/` (gitignored). Tables written from scratch that only borrow setting *names* (Magna road, Dragon Empire) are fine and ship built in (`scripts/vale-tables.mjs`), because Captain doesn't want an import step.
-- **Built-in tables install and update themselves** (`syncBuiltinTables`, on ready, active GM only). Each installed table carries a fingerprint flag; an unedited one updates when the module changes, an edited one is never touched. So edit table content in the `.mjs` files and ship a release, never tell Captain to re-import.
+- **Campaign tables live in a secret gist, not this repo.** The repo is public; the Misty Vale tables (and anything Free League-derived) go in Captain's secret gist, one `.json` file per region. Working clone: `~/terrain-forge-vale` (gist `aeee2777f3917151ed9d4580c4fdc578`; pushes over SSH using `~/.ssh/github`, set in that clone's `core.sshCommand`). Pushing the gist is enough: no module release needed. The module reads it via `api.github.com/gists/<id>` (CORS-open, never stale; 60 unauthenticated calls/hour, one per world load). Raw source material stays in `private/` (gitignored).
+- **Built-in and gist tables install and update themselves** (`syncBuiltinTables`, on ready, active GM only). Each installed table carries a fingerprint flag; an unedited one updates when its source changes, an edited one is never touched. So change table content at the source (starter `.mjs` or the gist), never tell Captain to re-import.
 
 ## Layout
 
 - `scripts/lib.mjs` – pure logic (sizes, prompt, cost, parsing). No Foundry globals.
 - `scripts/main.mjs` – Foundry glue: settings, ForgeApp dialog, PlaceHiddenApp, fal call, scene/journal creation, reforge, JSON table import.
 - `scripts/starter-tables.mjs` – generic Forest and Cave tables (public, original content).
-- `scripts/vale-tables.mjs` – Misty Vale region tables (`folder: "Misty Vale"`), original content.
 - `tests/lib.test.mjs`, `tests/smoke.test.mjs` – run with `cd tests && node lib.test.mjs && node smoke.test.mjs`. The smoke test mocks ApplicationV2 incl. its read-only `state` getter.
 
 ## Gotchas already hit
@@ -41,11 +40,11 @@ Foundry VTT module for Captain's Dragonbane campaign. Roll biome tables → buil
 3. Push to main. `.github/workflows/release.yml` builds module.zip and publishes the release.
 4. Captain updates the module in Sqyre and restarts the world.
 
-## Open threads (as of v0.1.6)
+## Open threads (as of v0.1.8)
 
 - v0.1.5 fixed the dialog not opening; not yet confirmed live.
 - Top-down framing: v0.1.3 rewrote side-view table entries. Captain still to compare flash vs pro on the same prompt via Reforge.
 - Right-click "Reforge" uses hooks `getSceneContextOptions` (v13+) and `getSceneDirectoryEntryContext` (v12); unverified on v14. Fallback: "Load rolls and prompt from the current scene" button in the dialog.
-- v0.1.6 added JSON table import + `Setting:` lines; v0.1.7 made built-in tables install automatically (Misty Vale included). Import stays for one-off tables.
+- v0.1.6 added JSON table import + `Setting:` lines; v0.1.7 made built-in tables install automatically; v0.1.8 moved the Vale tables to the secret gist ("Private tables link" setting). Import stays for one-off tables. v0.1.7 shipped Magna Woods publicly for a few hours; it's still in git history, which is fine (original text only).
 - Misty Vale regions: Magna Woods drafted (pilot, not yet forged live; check the auto-install and fingerprint updates on real Foundry v14). Still to do: Around Outskirt, Iron Forest, Haunted Marshes, Foot of the Mountains. Plus generic fantasy biomes (public, original content) alongside Forest/Cave.
 - Later ideas: Claude API to polish prompts or check which rolled features appear in the image; VPS proxy so the fal key isn't in the browser.
