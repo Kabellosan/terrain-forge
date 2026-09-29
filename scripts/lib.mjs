@@ -9,10 +9,59 @@ export const SIZE_PRESETS = {
   huge:   { w: 40, h: 28, label: "Huge (40×28 squares)" }
 };
 
+// Picked from a side-by-side test (2026-09-29): GPT Image 1.5 and Nano Banana 2
+// keep the camera truly straight down; FLUX.2 tends to tilt trunks and statues.
 export const MODELS = {
-  "fal-ai/flux-2/flash": "FLUX.2 flash — cheap and fast (~2¢)",
-  "fal-ai/flux-2-pro": "FLUX.2 pro — best quality (~8¢)"
+  "fal-ai/gpt-image-1.5": "GPT Image 1.5 — true top-down, clean and literal (~5¢)",
+  "fal-ai/nano-banana-2": "Nano Banana 2 — true top-down, richest detail (~12¢)",
+  "fal-ai/flux-2/flash": "FLUX.2 flash — cheapest (~2¢), camera may tilt",
+  "fal-ai/flux-2-pro": "FLUX.2 pro (~8¢), camera may tilt"
 };
+
+// Shapes the non-FLUX models accept instead of pixel sizes.
+const NANO_RATIOS = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"];
+const GPT_SIZES = ["1536x1024", "1024x1024", "1024x1536"];
+
+/** The option whose width:height is closest to w:h (compared on a log scale). */
+export function nearestShape(w, h, options, sep) {
+  const want = Math.log(w / h);
+  const ratio = (o) => { const [a, b] = o.split(sep).map(Number); return Math.log(a / b); };
+  return options.reduce((best, o) => (Math.abs(ratio(o) - want) < Math.abs(ratio(best) - want) ? o : best));
+}
+
+/** Request body for a fal.ai model, sized to fit the scene. */
+export function imageRequest(model, prompt, dims) {
+  const base = { prompt, num_images: 1, output_format: "jpeg", sync_mode: true };
+  if (model.includes("nano-banana")) {
+    return { ...base, aspect_ratio: nearestShape(dims.sceneW, dims.sceneH, NANO_RATIOS, ":"), resolution: "2K" };
+  }
+  if (model.includes("gpt-image")) {
+    return { ...base, image_size: nearestShape(dims.sceneW, dims.sceneH, GPT_SIZES, "x"), quality: "medium" };
+  }
+  return { ...base, image_size: { width: dims.imgW, height: dims.imgH }, enable_safety_checker: true };
+}
+
+/** What the dialog shows as the image size for this model. */
+export function imageSizeLabel(model, dims) {
+  if (model.includes("nano-banana")) return `${nearestShape(dims.sceneW, dims.sceneH, NANO_RATIOS, ":")} at 2K`;
+  if (model.includes("gpt-image")) return `${nearestShape(dims.sceneW, dims.sceneH, GPT_SIZES, "x")}px`;
+  return `${dims.imgW}×${dims.imgH}px`;
+}
+
+/**
+ * Centre crop that brings an image to the scene's shape, so the art lines up
+ * with the grid. Null when it's already within 1%.
+ */
+export function cropBox(srcW, srcH, targetW, targetH) {
+  const src = srcW / srcH, want = targetW / targetH;
+  if (Math.abs(src / want - 1) <= 0.01) return null;
+  if (src > want) {
+    const sw = Math.round(srcH * want);
+    return { sx: Math.floor((srcW - sw) / 2), sy: 0, sw, sh: srcH };
+  }
+  const sh = Math.round(srcW / want);
+  return { sx: 0, sy: Math.floor((srcH - sh) / 2), sw: srcW, sh };
+}
 
 // Foundry's minimum grid size is 50 px; fal.ai accepts 512–2048 px per side.
 export const MIN_GRID_PX = 50;
@@ -38,9 +87,11 @@ export function computeDims(w, h) {
   return { w, h, gridPx, sceneW, sceneH, imgW: fit(sceneW), imgH: fit(sceneH) };
 }
 
-/** Rough cost in USD, from fal.ai list prices (flash per MP; pro first MP + extra MP rounded up). */
-export function estimateCost(model, imgW, imgH) {
-  const mp = (imgW * imgH) / 1e6;
+/** Rough cost in USD, from fal.ai list prices (flash per MP; pro first MP + extra MP rounded up; GPT and Nano Banana flat per image). */
+export function estimateCost(model, dims) {
+  if (model.includes("nano-banana-2")) return 0.12; // flat, at 2K
+  if (model.includes("gpt-image-1.5")) return imageRequest(model, "", dims).image_size === "1024x1024" ? 0.034 : 0.05; // medium quality
+  const mp = (dims.imgW * dims.imgH) / 1e6;
   if (model.includes("flash")) return 0.005 * mp;
   if (model.includes("pro")) return 0.03 + 0.015 * Math.max(0, Math.ceil(mp) - 1);
   return null;

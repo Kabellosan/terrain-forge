@@ -79,7 +79,16 @@ Importing the same file again updates those tables in place, so you can edit the
 
 ## Cost
 
-About 1.5¢ per map on FLUX.2 flash, 6–8¢ on FLUX.2 pro. The dialog shows an estimate before you forge.
+Pick the model in the dialog (default set in the module settings):
+
+| Model | Per map | Notes |
+|---|---|---|
+| **GPT Image 1.5** (default) | ~5¢ | Truly top-down, clean, follows the rolls closely. Max 1536 px, so large maps look soft zoomed in. |
+| **Nano Banana 2** | ~12¢ | Truly top-down, richest painterly detail, 2K. Busier; a little looser with the rolls. |
+| FLUX.2 flash | ~1.5¢ | Cheapest, but the camera often tilts (visible trunks, leaning statues). |
+| FLUX.2 pro | 6–8¢ | Same tilt problem as flash. |
+
+The dialog shows an estimate before you forge. GPT Image and Nano Banana take a shape (like 4:3) rather than exact pixels, so the image is trimmed at the edges to fit the scene's grid exactly.
 
 ## If forging fails with a network/CORS error
 
@@ -89,4 +98,4 @@ The module calls fal.ai straight from your browser. If your browser or fal ever 
 
 - No walls or vision by design.
 - The image model sometimes leaves out a rolled feature, especially with many rolls. Keep visible rolls to about 3–5 per map, and check the map against the journal.
-- Scene images are ~2048 px wide, so large maps look soft when zoomed far in.
+- Scene images are 1536–2400 px wide depending on the model, so large maps look soft when zoomed far in.

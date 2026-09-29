@@ -25,7 +25,7 @@ Hooks.once("init", () => {
   });
   game.settings.register(MOD, "model", {
     name: "Default image model",
-    scope: "world", config: true, type: String, choices: L.MODELS, default: "fal-ai/flux-2/flash"
+    scope: "world", config: true, type: String, choices: L.MODELS, default: "fal-ai/gpt-image-1.5"
   });
   game.settings.register(MOD, "style", {
     name: "Campaign art style",
@@ -366,20 +366,14 @@ async function ensureDir(path) {
   }
 }
 
-async function generateImage({ prompt, model, imgW, imgH }) {
+async function generateImage({ prompt, model, dims }) {
   const key = game.settings.get(MOD, "falKey").trim();
   if (!key) throw new Error("No fal.ai API key set. Add it in Configure Settings → Terrain Forge.");
   const endpoint = game.settings.get(MOD, "endpoint").replace(/\/+$/, "");
   const res = await fetch(`${endpoint}/${model}`, {
     method: "POST",
     headers: { "Authorization": `Key ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt,
-      image_size: { width: imgW, height: imgH },
-      output_format: "jpeg",
-      sync_mode: true,
-      enable_safety_checker: true
-    })
+    body: JSON.stringify(L.imageRequest(model, prompt, dims))
   });
   if (!res.ok) {
     const body = (await res.text()).slice(0, 300);
@@ -392,6 +386,20 @@ async function generateImage({ prompt, model, imgW, imgH }) {
   if (data?.has_nsfw_concepts?.[0]) throw new Error("fal.ai's safety filter blanked this image. Try rerolling or rewording.");
   // sync_mode returns a data URI; fetch() turns either a data URI or a URL into a blob.
   return (await fetch(url)).blob();
+}
+
+/** Models that take a shape ("4:3") rather than pixels come back a little off; trim to the scene. */
+async function cropToScene(blob, w, h) {
+  const bmp = await createImageBitmap(blob);
+  const box = L.cropBox(bmp.width, bmp.height, w, h);
+  if (!box) { bmp.close?.(); return blob; }
+  const canvas = document.createElement("canvas");
+  canvas.width = box.sw;
+  canvas.height = box.sh;
+  canvas.getContext("2d").drawImage(bmp, box.sx, box.sy, box.sw, box.sh, 0, 0, box.sw, box.sh);
+  bmp.close?.();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("could not trim the image to the scene"))), "image/jpeg", 0.92));
 }
 
 async function setBackground(scene, path) {
@@ -411,7 +419,7 @@ async function forgeScene(state) {
   const model = state.model;
   const name = state.sceneName?.trim() || `${state.biome} ${new Date().toLocaleDateString()}`;
 
-  const blob = await generateImage({ prompt: state.prompt, model, imgW: dims.imgW, imgH: dims.imgH });
+  const blob = await cropToScene(await generateImage({ prompt: state.prompt, model, dims }), dims.sceneW, dims.sceneH);
 
   const dir = `worlds/${game.world.id}/terrain-forge`;
   await ensureDir(dir);
@@ -605,7 +613,7 @@ class ForgeApp extends ApplicationV2 {
     for (const t of cats) if (s.counts[t.id] === undefined) s.counts[t.id] = t.rolls;
 
     const dims = L.computeDims(s.w, s.h);
-    const cost = L.estimateCost(s.model, dims.imgW, dims.imgH);
+    const cost = L.estimateCost(s.model, dims);
     const opt = (v, label, sel) => `<option value="${L.escapeHTML(v)}" ${v === sel ? "selected" : ""}>${L.escapeHTML(label)}</option>`;
 
     const rolledHTML = s.rolled.length
@@ -669,7 +677,7 @@ class ForgeApp extends ApplicationV2 {
       </div>
 
       <footer class="tf-footer">
-        <span class="tf-status">${L.escapeHTML(s.status || `${dims.w}×${dims.h} squares · ${dims.imgW}×${dims.imgH}px${cost != null ? ` · ~$${cost.toFixed(3)}` : ""}`)}</span>
+        <span class="tf-status">${L.escapeHTML(s.status || `${dims.w}×${dims.h} squares · ${L.imageSizeLabel(s.model, dims)}${cost != null ? ` · ~$${cost.toFixed(3)}` : ""}`)}</span>
         <button type="button" data-action="forge" ${s.busy || !s.prompt ? "disabled" : ""}>
           <i class="fa-solid ${s.busy ? "fa-spinner fa-spin" : "fa-hammer"}"></i> ${forgeLabel}
         </button>
