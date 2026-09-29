@@ -78,17 +78,16 @@ export function slugify(s) {
     .trim().replace(/[\s_]+/g, "-").replace(/-+/g, "-").slice(0, 40) || "map";
 }
 
+export const DEFAULT_FRAMING = "Flat top-down tactical battle map for a virtual tabletop, orthographic plan view. The camera points straight down at the ground at exactly 90 degrees, like a satellite photo or a floor plan: no tilt, no isometric angle, no perspective, no horizon, no sky. Everything is seen from directly above: trees appear only as round leafy canopies with no visible trunks, rocks and objects show only their top surfaces, nothing is seen from the side.";
+
 /**
  * Build the image prompt from the visible rolled features only.
  * Hidden results never reach the prompt, so traps are never painted.
  */
-export function buildPrompt({ biome, features, style }) {
-  const parts = [
-    "Flat top-down tactical battle map for a virtual tabletop, orthographic plan view.",
-    "The camera points straight down at the ground at exactly 90 degrees, like a satellite photo or a floor plan: no tilt, no isometric angle, no perspective, no horizon, no sky.",
-    "Everything is seen from directly above: trees appear only as round leafy canopies with no visible trunks, rocks and objects show only their top surfaces, nothing is seen from the side.",
-    `Setting: ${biome.toLowerCase()}.`
-  ];
+export function buildPrompt({ biome, features, style, framing = DEFAULT_FRAMING }) {
+  const parts = [];
+  if (framing?.trim()) parts.push(framing.trim());
+  parts.push(`Setting: ${biome.toLowerCase()}.`);
   if (features.length) parts.push(`Seen from above, the map contains: ${features.join("; ")}.`);
   parts.push("Leave open, walkable ground between the features so figures can move around them.");
   parts.push("No grid lines, no text, no labels, no borders, no people, no creatures.");

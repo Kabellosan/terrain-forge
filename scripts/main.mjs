@@ -29,6 +29,11 @@ Hooks.once("init", () => {
     scope: "world", config: true, type: String,
     default: "hand-painted top-down fantasy battle map, muted natural colours, soft ambient shadows, rich ground texture, consistent painterly detail"
   });
+  game.settings.register(MOD, "framing", {
+    name: "Camera and framing",
+    hint: "The opening of every prompt: how the map is viewed. Edit this if maps come out tilted or isometric. Clear it to restore the default.",
+    scope: "world", config: true, type: String, default: L.DEFAULT_FRAMING
+  });
   game.settings.register(MOD, "gridDistance", {
     name: "Grid distance per square",
     hint: "Dragonbane uses 2 metres per square.",
@@ -370,7 +375,8 @@ class ForgeApp extends ApplicationV2 {
     s.prompt = L.buildPrompt({
       biome: s.biome,
       features: s.rolled.filter((r) => !r.hidden).map((r) => r.name),
-      style: game.settings.get(MOD, "style")
+      style: game.settings.get(MOD, "style"),
+      framing: game.settings.get(MOD, "framing") || L.DEFAULT_FRAMING
     });
     s.promptEdited = false;
   }
