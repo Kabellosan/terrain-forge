@@ -1,0 +1,21 @@
+.terrain-forge .window-content { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; }
+.terrain-forge .tf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; }
+.terrain-forge label { display: flex; flex-direction: column; gap: 0.2rem; font-weight: 600; }
+.terrain-forge .tf-counts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; }
+.terrain-forge .tf-counts label { width: 110px; }
+.terrain-forge .tf-counts button { flex: 1 0 100%; }
+.terrain-forge .tf-rolled { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; max-height: 260px; overflow-y: auto; }
+.terrain-forge .tf-rolled li { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; background: rgba(0, 0, 0, 0.08); }
+.terrain-forge .tf-rolled li.is-hidden { background: rgba(120, 0, 160, 0.12); }
+.terrain-forge .tf-cat { flex: 0 0 90px; font-size: 0.85em; opacity: 0.75; }
+.terrain-forge .tf-text { flex: 1; display: flex; flex-direction: column; }
+.terrain-forge .tf-text em { font-size: 0.85em; opacity: 0.8; }
+.terrain-forge .tf-rolled a { cursor: pointer; padding: 0 0.2rem; }
+.terrain-forge .tf-rolled button { flex: 0 0 auto; width: auto; }
+.terrain-forge .tf-prompt textarea { font-weight: normal; resize: vertical; }
+.terrain-forge .tf-link { cursor: pointer; font-size: 0.9em; }
+.terrain-forge .tf-hint { opacity: 0.75; margin: 0; }
+.terrain-forge .tf-footer { display: flex; align-items: center; gap: 0.5rem; }
+.terrain-forge .tf-status { flex: 1; font-size: 0.85em; opacity: 0.8; }
+.terrain-forge .tf-footer button { flex: 0 0 auto; width: auto; }
+.tf-open { margin-top: 0.25rem; }
