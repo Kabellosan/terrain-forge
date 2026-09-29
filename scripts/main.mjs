@@ -83,6 +83,11 @@ const reforgeOption = {
 Hooks.on("getSceneContextOptions", (app, options) => options.push(reforgeOption));          // v13+
 Hooks.on("getSceneDirectoryEntryContext", (html, options) => options.push(reforgeOption)); // v12
 
+function reportError(what, err) {
+  console.error("Terrain Forge |", what, err);
+  ui.notifications?.error(`Terrain Forge: ${what}. ${err?.message ?? err} (details in the F12 console)`);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Tables                                                             */
 /* ------------------------------------------------------------------ */
@@ -349,35 +354,46 @@ class ForgeApp extends ApplicationV2 {
   static lastState = null;
   static instance = null;
 
-  /** Open the dialog, reusing an open one. Pass a scene to reforge it. */
+  /** Open the dialog (one shared instance). Pass a scene to reforge it. */
   static open(scene = null) {
-    const state = scene ? stateFromScene(scene) : null;
-    if (ForgeApp.instance?.rendered) {
-      if (state) ForgeApp.instance.state = state;
-      ForgeApp.instance.render({ force: true });
-      ForgeApp.instance.bringToFront?.();
-      return ForgeApp.instance;
+    try {
+      const state = scene ? stateFromScene(scene) : null;
+      if (!ForgeApp.instance) ForgeApp.instance = new ForgeApp({}, state);
+      else if (state) ForgeApp.instance.tf = state;
+      const app = ForgeApp.instance;
+      return Promise.resolve(app.render({ force: true }))
+        .then(() => { app.bringToFront?.(); return app; })
+        .catch((err) => reportError("could not open the dialog", err));
+    } catch (err) {
+      reportError("could not open the dialog", err);
     }
-    ForgeApp.instance = new ForgeApp({}, state);
-    return ForgeApp.instance.render({ force: true });
   }
 
   constructor(options = {}, state = null) {
     super(options);
-    this.state = state ?? foundry.utils.deepClone(ForgeApp.lastState ?? defaultState());
-    this.state.busy = false;
-    this.state.status = "";
+    this.tf = state ?? foundry.utils.deepClone(ForgeApp.lastState ?? defaultState());
+    this.tf.busy = false;
+    this.tf.status = "";
   }
 
   async close(options) {
-    ForgeApp.lastState = foundry.utils.deepClone({ ...this.state, busy: false, status: "" });
+    ForgeApp.lastState = foundry.utils.deepClone({ ...this.tf, busy: false, status: "" });
     return super.close(options);
   }
 
   get tables() { return forgeTables(); }
 
   async _renderHTML() {
-    const s = this.state;
+    try {
+      return await this._buildHTML();
+    } catch (err) {
+      reportError("the dialog failed to draw", err);
+      return `<p class="tf-hint">Something went wrong drawing this window: <code>${L.escapeHTML(err?.message ?? err)}</code><br>Click <a data-action="fresh">New</a> to reset, and send the console error to whoever maintains Terrain Forge.</p>`;
+    }
+  }
+
+  async _buildHTML() {
+    const s = this.tf;
     const tables = this.tables;
     const biomes = [...new Set(tables.map((t) => t.biome))].sort();
     if (!biomes.length) {
@@ -460,7 +476,7 @@ class ForgeApp extends ApplicationV2 {
 
   _replaceHTML(result, content) {
     content.innerHTML = result;
-    const s = this.state;
+    const s = this.tf;
     content.querySelectorAll("[data-field]").forEach((el) => {
       el.addEventListener("change", () => {
         const f = el.dataset.field;
@@ -483,7 +499,7 @@ class ForgeApp extends ApplicationV2 {
   }
 
   rebuildPrompt() {
-    const s = this.state;
+    const s = this.tf;
     s.prompt = L.buildPrompt({
       biome: s.biome,
       features: s.rolled.filter((r) => !r.hidden).map((r) => r.name),
@@ -494,7 +510,7 @@ class ForgeApp extends ApplicationV2 {
   }
 
   static async onRoll() {
-    const s = this.state;
+    const s = this.tf;
     const cats = this.tables.filter((t) => t.biome === s.biome);
     s.rolled = [];
     for (const t of cats) {
@@ -509,7 +525,7 @@ class ForgeApp extends ApplicationV2 {
   }
 
   static async onReroll(event, target) {
-    const s = this.state;
+    const s = this.tf;
     const i = Number(target.dataset.index);
     const old = s.rolled[i];
     const t = this.tables.find((x) => x.id === old?.tableId);
@@ -521,8 +537,8 @@ class ForgeApp extends ApplicationV2 {
   }
 
   static onRemove(event, target) {
-    this.state.rolled.splice(Number(target.dataset.index), 1);
-    if (!this.state.promptEdited) this.rebuildPrompt();
+    this.tf.rolled.splice(Number(target.dataset.index), 1);
+    if (!this.tf.promptEdited) this.rebuildPrompt();
     this.render();
   }
 
@@ -532,17 +548,17 @@ class ForgeApp extends ApplicationV2 {
 
   static onLoadCurrent() {
     if (!canvas.scene) return;
-    this.state = stateFromScene(canvas.scene);
+    this.tf = stateFromScene(canvas.scene);
     this.render();
   }
 
   static onFresh() {
-    this.state = defaultState();
+    this.tf = defaultState();
     this.render();
   }
 
   static async onForge() {
-    const s = this.state;
+    const s = this.tf;
     if (s.busy) return;
     s.busy = true;
     s.status = "Painting the map… (10–40 seconds)";
