@@ -23,25 +23,25 @@ export const STARTER_TABLES = [
       { name: "a huge fallen oak lying across the ground", effect: "Cover. Ranged attacks at someone behind it get a bane. Climbing over costs 2 m of movement." },
       { name: "a cluster of mossy standing stones", effect: "Full cover from one direction. Can't be shot through." },
       { name: "thick bramble thickets", effect: "Blocks sight. Pushing through: half movement and D4 damage (armour protects)." },
-      { name: "a ring of ancient beech trunks wide as doors", effect: "Cover. Someone tucked between trunks can't be flanked." },
+      { name: "a ring of huge ancient beech trees with broad overlapping crowns", effect: "Cover. Someone tucked between trunks can't be flanked." },
       { name: "a collapsed woodcutter's lean-to and a stack of logs", effect: "Cover. A STR roll topples the logs: D6 damage to anyone in the 2 m in front." },
-      { name: "a large boulder split by a young tree", effect: "Cover. Climbing on top gives height: boon on ranged attacks, but no cover up there." },
-      { name: "dense young spruce saplings", effect: "Blocks sight beyond 4 m. SNEAKING gets a boon here." },
-      { name: "a mound of earth around an overturned root plate", effect: "Cover for anyone crouched behind it." }
+      { name: "a large boulder cracked in two, a small tree crown growing from the crack", effect: "Cover. Climbing on top gives height: boon on ranged attacks, but no cover up there." },
+      { name: "a dense patch of young spruce, tightly packed small dark-green crowns", effect: "Blocks sight beyond 4 m. SNEAKING gets a boon here." },
+      { name: "a fallen tree's upturned root plate, a crater of torn earth beside it", effect: "Cover for anyone crouched behind it." }
     ]
   },
   {
     biome: "Forest", category: "Features", hidden: false, rolls: 1,
     blurb: "Something interesting to look at, use, or wonder about.",
     results: [
-      { name: "a half-collapsed charcoal kiln still trailing smoke", effect: "Knock it over (STR roll) to scatter embers in a 4 m area: D6 fire damage to anyone caught." },
-      { name: "a weathered wooden shrine with offerings of bread and ribbons", effect: "Taking an offering could anger something. Leaving one might earn a favour." },
-      { name: "a hunter's platform built high in a tree", effect: "Reach it with an ACROBATICS roll. Up top: boon on ranged attacks, cover from below." },
-      { name: "a ring of pale toadstools", effect: "Stepping inside: WIL roll or become Dazed until you step out." },
+      { name: "a round half-collapsed charcoal kiln mound with thin smoke rising from its top", effect: "Knock it over (STR roll) to scatter embers in a 4 m area: D6 fire damage to anyone caught." },
+      { name: "a small wooden shrine roof surrounded by offerings of bread and coloured ribbons", effect: "Taking an offering could anger something. Leaving one might earn a favour." },
+      { name: "a square wooden hunter's platform nestled inside a large tree crown", effect: "Reach it with an ACROBATICS roll. Up top: boon on ranged attacks, cover from below." },
+      { name: "a wide ring of pale toadstool caps on the grass", effect: "Stepping inside: WIL roll or become Dazed until you step out." },
       { name: "a small pond with a rotting rowboat", effect: "Deep water: SWIMMING rolls needed. The boat sinks after a round of use." },
-      { name: "the bones of a large beast picked clean", effect: "BUSHCRAFT reveals what killed it, and that it's still around." },
+      { name: "the skeleton of a large beast lying flat on the ground", effect: "BUSHCRAFT reveals what killed it, and that it's still around." },
       { name: "an abandoned campfire with scattered gear", effect: "Search: roll once on a loot table of your choice." },
-      { name: "a hollow tree large enough to hide in", effect: "One person can hide inside. Full cover, but they can't attack out of it." }
+      { name: "a massive hollow tree stump with a dark open centre", effect: "One person can hide inside. Full cover, but they can't attack out of it." }
     ]
   },
   {
@@ -74,12 +74,12 @@ export const STARTER_TABLES = [
     biome: "Cave", category: "Cover", hidden: false, rolls: 2,
     blurb: "Rock to hide behind.",
     results: [
-      { name: "thick stalagmite columns", effect: "Cover. A dragon roll on a heavy attack can shatter one." },
+      { name: "clusters of thick round stalagmites", effect: "Cover. A dragon roll on a heavy attack can shatter one." },
       { name: "a heap of fallen rubble", effect: "Cover. Rough terrain to cross." },
       { name: "a low natural rock wall across part of the cavern", effect: "Cover for anyone crouched behind it. Vaulting it costs 2 m." },
       { name: "a narrow crevice in the wall big enough for one person", effect: "Full cover. Attacks out of it get a bane." },
       { name: "an abandoned ore cart on broken rails", effect: "Cover. Can be pushed (STR roll) 10 m along the rails as a D8 ram." },
-      { name: "large crystal formations jutting from the floor", effect: "Cover. Light sources reflect off them: bane on SNEAKING nearby." }
+      { name: "large clusters of pale crystals spread across the floor", effect: "Cover. Light sources reflect off them: bane on SNEAKING nearby." }
     ]
   },
   {
@@ -88,10 +88,10 @@ export const STARTER_TABLES = [
     results: [
       { name: "glowing blue fungus on the walls", effect: "Dim light around it. Eating it: CON roll or become Sickly. Pass and see in darkness for an hour." },
       { name: "an old rope bridge over a narrow chasm", effect: "ACROBATICS to cross in combat. Cutting it takes one action." },
-      { name: "a carved stone altar stained dark", effect: "Something was worshipped here. Touching it could wake it." },
+      { name: "a flat carved stone altar slab stained dark", effect: "Something was worshipped here. Touching it could wake it." },
       { name: "a pile of bones and rusted weapons", effect: "Scavenge a basic weapon. Also a clue about what lairs here." },
-      { name: "a hanging curtain of roots through a crack in the ceiling", effect: "A way up to the surface, for a STR or ACROBATICS roll." },
-      { name: "a trickling waterfall into a basin", effect: "Loud: bane on AWARENESS within 6 m, and a boon on SNEAKING." }
+      { name: "a patch of daylight and fallen roots on the floor beneath a hole in the cave ceiling", effect: "A way up to the surface, for a STR or ACROBATICS roll." },
+      { name: "a round stone basin of splashing water fed by a trickle from the cave wall", effect: "Loud: bane on AWARENESS within 6 m, and a boon on SNEAKING." }
     ]
   },
   {
