@@ -23,6 +23,14 @@ Works on Foundry v13 and v14. System-agnostic, starter tables written for Dragon
 
 Use Simple Fog for hiding parts of the map.
 
+## Reforging
+
+Every forged scene remembers its biome, rolls, prompt and model.
+
+- Right-click a forged scene in the Scenes sidebar → **Reforge with Terrain Forge**, or open the dialog while viewing it and click **Load rolls and prompt from the current scene**.
+- Tick **Replace this scene's map** to swap the image on the same scene (tokens, markers and journal stay; the journal is updated). Untick it to forge a separate new scene.
+- Closing the dialog keeps your current rolls and prompt; **New** starts fresh.
+
 ## Your own tables
 
 Any RollTable inside the **Terrain Forge** folder (any subfolder) named `Biome: Category` is picked up.

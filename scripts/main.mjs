@@ -47,7 +47,7 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   const mod = game.modules.get(MOD);
   mod.api = {
-    open: () => new ForgeApp().render({ force: true }),
+    open: (scene) => ForgeApp.open(scene),
     createStarterTables
   };
   log("ready — open with game.modules.get('terrain-forge').api.open()");
@@ -62,10 +62,26 @@ Hooks.on("renderSceneDirectory", (app, html) => {
   btn.type = "button";
   btn.className = "tf-open";
   btn.innerHTML = `<i class="fa-solid fa-mountain-sun"></i> Terrain Forge`;
-  btn.addEventListener("click", () => new ForgeApp().render({ force: true }));
+  btn.addEventListener("click", () => ForgeApp.open());
   const target = root.querySelector(".header-actions") ?? root.querySelector(".directory-header") ?? root;
   target.append(btn);
 });
+
+// Right-click a forged scene in the sidebar → "Reforge".
+function sceneFromLi(li) {
+  const el = li instanceof HTMLElement ? li : li?.[0];
+  const id = el?.dataset?.entryId ?? el?.dataset?.documentId;
+  return id ? game.scenes.get(id) : null;
+}
+const reforgeOption = {
+  name: "Reforge with Terrain Forge",
+  label: "Reforge with Terrain Forge",
+  icon: '<i class="fa-solid fa-hammer"></i>',
+  condition: (li) => game.user.isGM && !!sceneFromLi(li)?.getFlag(MOD, "prompt"),
+  callback: (li) => { const scene = sceneFromLi(li); if (scene) ForgeApp.open(scene); }
+};
+Hooks.on("getSceneContextOptions", (app, options) => options.push(reforgeOption));          // v13+
+Hooks.on("getSceneDirectoryEntryContext", (html, options) => options.push(reforgeOption)); // v12
 
 /* ------------------------------------------------------------------ */
 /*  Tables                                                             */
@@ -205,20 +221,49 @@ async function forgeScene(state) {
   const up = await filePicker().upload("data", dir, file, {}, { notify: false });
   const path = up?.path ?? `${dir}/${fname}`;
 
+  const flags = { [MOD]: { biome: state.biome, prompt: state.prompt, rolled: state.rolled, model, w: dims.w, h: dims.h } };
+  const content = L.journalHTML({ biome: state.biome, dims, rolled: state.rolled, prompt: state.prompt, model });
+  const grid = {
+    type: CONST.GRID_TYPES.SQUARE,
+    size: dims.gridPx,
+    distance: game.settings.get(MOD, "gridDistance"),
+    units: game.settings.get(MOD, "gridUnits")
+  };
+
+  // Reforge: swap the map on an existing scene, keep its tokens, notes and journal.
+  const target = state.replace && state.targetSceneId ? game.scenes.get(state.targetSceneId) : null;
+  if (target) {
+    const previous = target.getFlag(MOD, "rolled") ?? [];
+    await target.update({ width: dims.sceneW, height: dims.sceneH, grid, flags });
+    await setBackground(target, path);
+    let entry = target.journal;
+    if (typeof entry === "string") entry = game.journal.get(entry);
+    if (!entry) {
+      const journalFolder = await ensureFolder("JournalEntry");
+      entry = await JournalEntry.create({
+        name: `Forge: ${target.name}`, folder: journalFolder.id,
+        ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }, flags,
+        pages: [{ name: "Scene features", type: "text", text: { content, format: 1 } }]
+      });
+      await target.update({ journal: entry.id });
+    } else {
+      const page = entry.pages.contents[0];
+      if (page) await page.update({ "text.content": content });
+      else await entry.createEmbeddedDocuments("JournalEntryPage", [{ name: "Scene features", type: "text", text: { content, format: 1 } }]);
+    }
+    await refreshThumb(target);
+    const oldHidden = new Set(previous.filter((r) => r.hidden).map((r) => r.name));
+    return { scene: target, entry, replaced: true, newHidden: state.rolled.filter((r) => r.hidden && !oldHidden.has(r.name)) };
+  }
+
   const sceneFolder = await ensureFolder("Scene");
-  const flags = { [MOD]: { biome: state.biome, prompt: state.prompt, rolled: state.rolled, model } };
   const scene = await Scene.create({
     name,
     folder: sceneFolder.id,
     width: dims.sceneW,
     height: dims.sceneH,
     padding: 0,
-    grid: {
-      type: CONST.GRID_TYPES.SQUARE,
-      size: dims.gridPx,
-      distance: game.settings.get(MOD, "gridDistance"),
-      units: game.settings.get(MOD, "gridUnits")
-    },
+    grid,
     // No walls in this workflow, so no token vision: the map is fully lit and
     // you hide things with Simple Fog or by hand.
     tokenVision: false,
@@ -233,20 +278,46 @@ async function forgeScene(state) {
     folder: journalFolder.id,
     ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE },
     flags,
-    pages: [{
-      name: "Scene features",
-      type: "text",
-      text: { content: L.journalHTML({ biome: state.biome, dims, rolled: state.rolled, prompt: state.prompt, model }), format: 1 }
-    }]
+    pages: [{ name: "Scene features", type: "text", text: { content, format: 1 } }]
   });
   await scene.update({ journal: entry.id });
+  await refreshThumb(scene);
 
+  return { scene, entry, replaced: false, newHidden: state.rolled.filter((r) => r.hidden) };
+}
+
+async function refreshThumb(scene) {
   try {
     const t = await scene.createThumbnail();
     if (t?.thumb) await scene.update({ thumb: t.thumb });
   } catch (err) { log("thumbnail skipped", err); }
+}
 
-  return { scene, entry };
+/** Dialog state rebuilt from a forged scene's saved data. */
+function stateFromScene(scene) {
+  const f = scene.flags?.[MOD] ?? {};
+  const gridSize = scene.grid?.size || 100;
+  const w = f.w ?? Math.round(scene.width / gridSize);
+  const h = f.h ?? Math.round(scene.height / gridSize);
+  const preset = Object.entries(L.SIZE_PRESETS).find(([, p]) => p.w === w && p.h === h)?.[0] ?? "custom";
+  return {
+    ...defaultState(),
+    biome: f.biome ?? null, size: preset, w, h,
+    rolled: foundry.utils.deepClone(f.rolled ?? []),
+    prompt: f.prompt ?? "", promptEdited: true,
+    model: f.model ?? game.settings.get(MOD, "model"),
+    sceneName: scene.name, targetSceneId: scene.id, replace: true
+  };
+}
+
+function defaultState() {
+  return {
+    biome: null, size: "medium", w: 20, h: 15, counts: {},
+    rolled: [], prompt: "", promptEdited: false,
+    model: game.settings.get(MOD, "model"), sceneName: "",
+    targetSceneId: null, replace: false,
+    busy: false, status: ""
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -268,16 +339,40 @@ class ForgeApp extends ApplicationV2 {
       remove: ForgeApp.onRemove,
       rebuild: ForgeApp.onRebuild,
       forge: ForgeApp.onForge,
-      starter: ForgeApp.onStarter
+      starter: ForgeApp.onStarter,
+      loadCurrent: ForgeApp.onLoadCurrent,
+      fresh: ForgeApp.onFresh
     }
   };
 
-  state = {
-    biome: null, size: "medium", w: 20, h: 15, counts: {},
-    rolled: [], prompt: "", promptEdited: false,
-    model: game.settings.get(MOD, "model"), sceneName: "",
-    busy: false, status: ""
-  };
+  /** Last dialog state, kept for the browser session so closing doesn't lose work. */
+  static lastState = null;
+  static instance = null;
+
+  /** Open the dialog, reusing an open one. Pass a scene to reforge it. */
+  static open(scene = null) {
+    const state = scene ? stateFromScene(scene) : null;
+    if (ForgeApp.instance?.rendered) {
+      if (state) ForgeApp.instance.state = state;
+      ForgeApp.instance.render({ force: true });
+      ForgeApp.instance.bringToFront?.();
+      return ForgeApp.instance;
+    }
+    ForgeApp.instance = new ForgeApp({}, state);
+    return ForgeApp.instance.render({ force: true });
+  }
+
+  constructor(options = {}, state = null) {
+    super(options);
+    this.state = state ?? foundry.utils.deepClone(ForgeApp.lastState ?? defaultState());
+    this.state.busy = false;
+    this.state.status = "";
+  }
+
+  async close(options) {
+    ForgeApp.lastState = foundry.utils.deepClone({ ...this.state, busy: false, status: "" });
+    return super.close(options);
+  }
 
   get tables() { return forgeTables(); }
 
@@ -309,7 +404,23 @@ class ForgeApp extends ApplicationV2 {
           </li>`).join("")}</ul>`
       : `<p class="tf-hint">Set how many rolls each table gets, then roll.</p>`;
 
+    const target = s.targetSceneId ? game.scenes.get(s.targetSceneId) : null;
+    if (s.targetSceneId && !target) { s.targetSceneId = null; s.replace = false; }
+    const current = canvas.scene;
+    const canLoadCurrent = current?.getFlag(MOD, "prompt") && current.id !== s.targetSceneId;
+    const banner = target
+      ? `<div class="tf-banner">
+          <span><i class="fa-solid fa-map"></i> Loaded from <strong>${L.escapeHTML(target.name)}</strong></span>
+          <label class="tf-check"><input type="checkbox" data-field="replace" ${s.replace ? "checked" : ""}> Replace this scene's map</label>
+          <a data-action="fresh" title="Start a fresh forge"><i class="fa-solid fa-file"></i> New</a>
+        </div>`
+      : canLoadCurrent
+        ? `<div class="tf-banner"><a data-action="loadCurrent"><i class="fa-solid fa-download"></i> Load rolls and prompt from the current scene</a></div>`
+        : "";
+    const forgeLabel = target && s.replace ? "Replace map" : "Forge new scene";
+
     return `
+      ${banner}
       <div class="tf-grid">
         <label>Biome <select data-field="biome">${biomes.map((b) => opt(b, b, s.biome)).join("")}</select></label>
         <label>Size <select data-field="size">
@@ -342,7 +453,7 @@ class ForgeApp extends ApplicationV2 {
       <footer class="tf-footer">
         <span class="tf-status">${L.escapeHTML(s.status || `${dims.w}×${dims.h} squares · ${dims.imgW}×${dims.imgH}px${cost != null ? ` · ~$${cost.toFixed(3)}` : ""}`)}</span>
         <button type="button" data-action="forge" ${s.busy || !s.prompt ? "disabled" : ""}>
-          <i class="fa-solid ${s.busy ? "fa-spinner fa-spin" : "fa-hammer"}"></i> Forge scene
+          <i class="fa-solid ${s.busy ? "fa-spinner fa-spin" : "fa-hammer"}"></i> ${forgeLabel}
         </button>
       </footer>`;
   }
@@ -361,6 +472,7 @@ class ForgeApp extends ApplicationV2 {
         }
         else if (f === "w" || f === "h") s[f] = Number(el.value) || s[f];
         else if (f === "prompt") { s.prompt = el.value; s.promptEdited = true; }
+        else if (el.type === "checkbox") s[f] = el.checked;
         else s[f] = el.value;
         this.render();
       });
@@ -418,6 +530,17 @@ class ForgeApp extends ApplicationV2 {
 
   static async onStarter() { await createStarterTables(); this.render(); }
 
+  static onLoadCurrent() {
+    if (!canvas.scene) return;
+    this.state = stateFromScene(canvas.scene);
+    this.render();
+  }
+
+  static onFresh() {
+    this.state = defaultState();
+    this.render();
+  }
+
   static async onForge() {
     const s = this.state;
     if (s.busy) return;
@@ -425,12 +548,16 @@ class ForgeApp extends ApplicationV2 {
     s.status = "Painting the map… (10–40 seconds)";
     this.render();
     try {
-      const { scene, entry } = await forgeScene(s);
-      ui.notifications.info(`Terrain Forge: "${scene.name}" is ready.`);
-      await scene.view();
-      const hidden = s.rolled.filter((r) => r.hidden);
-      if (hidden.length) new PlaceHiddenApp({ scene, entry, hidden }).render({ force: true });
-      entry.sheet.render(true);
+      const { scene, entry, replaced, newHidden } = await forgeScene(s);
+      ui.notifications.info(`Terrain Forge: "${scene.name}" ${replaced ? "has a new map" : "is ready"}.`);
+      if (canvas.scene?.id !== scene.id) await scene.view();
+      if (newHidden.length) new PlaceHiddenApp({ scene, entry, hidden: newHidden }).render({ force: true });
+      if (!replaced) entry.sheet.render(true);
+      // Remember this scene so the next open can reforge it (off by default).
+      s.targetSceneId = scene.id;
+      s.replace = replaced;
+      s.busy = false;
+      s.status = "";
       this.close();
     } catch (err) {
       console.error(err);

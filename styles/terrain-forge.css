@@ -19,3 +19,7 @@
 .terrain-forge .tf-status { flex: 1; font-size: 0.85em; opacity: 0.8; }
 .terrain-forge .tf-footer button { flex: 0 0 auto; width: auto; }
 .tf-open { margin-top: 0.25rem; }
+.terrain-forge .tf-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.4rem 0.6rem; border-radius: 4px; background: rgba(255, 170, 0, 0.12); }
+.terrain-forge .tf-banner > span { flex: 1; }
+.terrain-forge .tf-banner a { cursor: pointer; }
+.terrain-forge .tf-check { flex-direction: row; align-items: center; gap: 0.3rem; font-weight: normal; }
