@@ -1,0 +1,16 @@
+{
+  "id": "terrain-forge",
+  "title": "Terrain Forge",
+  "description": "Roll biome tables, turn the results into an AI-painted battlemap, and get a GM journal of every feature and hidden hazard. System-agnostic, built for Dragonbane.",
+  "version": "0.1.0",
+  "authors": [{ "name": "Captain", "url": "https://github.com/Kabellosan" }],
+  "url": "https://github.com/Kabellosan/terrain-forge",
+  "manifest": "https://github.com/Kabellosan/terrain-forge/releases/latest/download/module.json",
+  "download": "https://github.com/Kabellosan/terrain-forge/releases/download/v0.1.0/module.zip",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14"
+  },
+  "esmodules": ["scripts/main.mjs"],
+  "styles": ["styles/terrain-forge.css"]
+}
