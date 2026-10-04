@@ -88,6 +88,8 @@ Pick the model in the dialog (default set in the module settings):
 | FLUX.2 flash | ~1.5¢ | Cheapest, but the camera often tilts (visible trunks, leaning statues). |
 | FLUX.2 pro | 6–8¢ | Same tilt problem as flash. |
 
+Worlds still set to a FLUX model switch to GPT Image 1.5 once when updating to v0.1.10, and reforging a FLUX map uses the default model. You can still pick FLUX in the dialog for one map.
+
 The dialog shows an estimate before you forge. GPT Image and Nano Banana take a shape (like 4:3) rather than exact pixels, so the image is trimmed at the edges to fit the scene's grid exactly.
 
 ## If forging fails with a network/CORS error

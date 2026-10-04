@@ -41,7 +41,9 @@ Foundry VTT module for Captain's Dragonbane campaign. Roll biome tables → buil
 3. Push to main. `.github/workflows/release.yml` builds module.zip and publishes the release.
 4. Captain updates the module in Sqyre and restarts the world.
 
-## Open threads (as of v0.1.9)
+## Open threads (as of v0.1.10)
+
+- v0.1.10: worlds saved on FLUX (the pre-v0.1.9 default) migrate to GPT Image once (hidden `modelMigration` setting); FLUX scenes reforge with the default. Captain made a bad complex map on flash by accident (2026-10-04).
 
 - v0.1.5 fixed the dialog not opening; not yet confirmed live.
 - Top-down framing: solved by switching models (v0.1.9), not by prompt wording. The flash-vs-pro comparison is moot.

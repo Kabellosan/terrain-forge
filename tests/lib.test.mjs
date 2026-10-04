@@ -52,3 +52,9 @@ assert.equal(L.cropBox(2048,1536,med.sceneW,med.sceneH),null);           // alre
 const tall=L.cropBox(1000,1000,2000,1000); assert.deepEqual(tall,{sx:0,sy:250,sw:1000,sh:500});
 for (const k of Object.keys(L.MODELS)) assert(L.estimateCost(k,med)>0, k);
 console.log("all tests pass");
+
+// Only GPT Image and Nano Banana count as top-down; the default is one of them.
+assert.ok(L.isTopDown(L.DEFAULT_MODEL) && L.MODELS[L.DEFAULT_MODEL]);
+assert.ok(L.isTopDown("fal-ai/nano-banana-2"));
+assert.ok(!L.isTopDown("fal-ai/flux-2/flash") && !L.isTopDown("fal-ai/flux-2-pro") && !L.isTopDown(undefined));
+console.log("isTopDown ok");
