@@ -37,7 +37,7 @@ const mkDoc = (d) => {
 globalThis.RollTable = { create: async (d) => { const t = mkDoc(d); tables.push(t); return t; } };
 globalThis.game = {
   folders,
-  settings: { register: (m, k, o) => (settings[k] = o.default), get: (m, k) => settings[k] },
+  settings: { register: (m, k, o) => (settings[k] = o.default), get: (m, k) => settings[k], set: async (m, k, v) => (settings[k] = v) },
   modules: new Map([["terrain-forge", {}]]),
   user: { id: "me", isGM: true }, users: { activeGM: { id: "other-gm" } }, tables, scenes: { get: (id) => (id === "s1" ? scene : null) }
 };
@@ -72,6 +72,7 @@ await app.close(); const again = await api.open();
 if (again.tf.rolled.length !== 2) throw new Error("state not remembered");
 await api.open(scene);
 if (!again.lastHTML.includes("Loaded from") || again.tf.targetSceneId !== "s1") throw new Error("reforge load failed");
+if (again.tf.model !== "fal-ai/gpt-image-1.5") throw new Error("a FLUX scene should reforge with the default model, got " + again.tf.model);
 if (!again.lastHTML.includes("Replace map")) throw new Error("replace label missing");
 Forge.onFresh.call(again); await again.render();
 if (again.tf.targetSceneId) throw new Error("fresh did not reset");
@@ -121,5 +122,13 @@ errors.length = before;
 globalThis.fetch = realFetch; fetched = []; settings.privateTables = "";
 await api.syncBuiltinTables();
 if (fetched.length) throw new Error("fetched with no private link set");
+// A world that saved FLUX (pre-v0.1.9 default) moves to GPT Image once; a later pick sticks.
+settings.model = "fal-ai/flux-2/flash"; settings.modelMigration = 0; settings.autoTables = false;
+game.users.activeGM.id = "me";
+hooks.ready.forEach((f) => f()); await new Promise((r) => setTimeout(r, 0));
+if (settings.model !== "fal-ai/gpt-image-1.5" || settings.modelMigration !== 1) throw new Error("model not migrated: " + settings.model);
+settings.model = "fal-ai/flux-2-pro";
+hooks.ready.forEach((f) => f()); await new Promise((r) => setTimeout(r, 0));
+if (settings.model !== "fal-ai/flux-2-pro") throw new Error("migration ran twice");
 if (errors.length) throw new Error("errors: " + errors.join(" | "));
-console.log("smoke test passes: open, roll, hidden-stays-out, remember, reforge-load, fresh, import, re-import, setting, builtin + gist install/update/keep-edits, broken gist file, grouped biomes");
+console.log("smoke test passes: open, roll, hidden-stays-out, remember, reforge-load, fresh, import, re-import, setting, builtin + gist install/update/keep-edits, broken gist file, grouped biomes, model migration");

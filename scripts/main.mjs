@@ -25,8 +25,11 @@ Hooks.once("init", () => {
   });
   game.settings.register(MOD, "model", {
     name: "Default image model",
-    scope: "world", config: true, type: String, choices: L.MODELS, default: "fal-ai/gpt-image-1.5"
+    hint: "GPT Image 1.5 is recommended. The FLUX models are cheaper but tilt the camera, so complex maps come out wrong; pick them per map in the dialog if you want to try.",
+    scope: "world", config: true, type: String, choices: L.MODELS, default: L.DEFAULT_MODEL
   });
+  // Bumped when a release moves the world off an old saved default (see migrateModel).
+  game.settings.register(MOD, "modelMigration", { scope: "world", config: false, type: Number, default: 0 });
   game.settings.register(MOD, "style", {
     name: "Campaign art style",
     hint: "Added to every prompt, so every map in the campaign shares one look. Change it once, not per map.",
@@ -67,10 +70,25 @@ Hooks.once("ready", () => {
     syncBuiltinTables
   };
   log("ready — open with game.modules.get('terrain-forge').api.open()");
+  if (isActiveGM()) migrateModel();
   if (isActiveGM() && game.settings.get(MOD, "autoTables")) {
     syncBuiltinTables().then((r) => { if (r?.made || r?.updated) ForgeApp.instance?.render(); });
   }
 });
+
+/**
+ * v0.1.10: worlds that saved a FLUX model (the default before v0.1.9) switch to
+ * GPT Image once. FLUX stays pickable in the dialog for a single map.
+ */
+async function migrateModel() {
+  if (game.settings.get(MOD, "modelMigration") >= 1) return;
+  const old = game.settings.get(MOD, "model");
+  if (!L.isTopDown(old)) {
+    await game.settings.set(MOD, "model", L.DEFAULT_MODEL);
+    ui.notifications.info(`Terrain Forge: default image model is now ${L.MODELS[L.DEFAULT_MODEL].split(" —")[0]} (was ${L.MODELS[old]?.split(" —")[0] ?? old}).`);
+  }
+  await game.settings.set(MOD, "modelMigration", 1);
+}
 
 // A "Terrain Forge" button in the Scenes sidebar, GM only.
 Hooks.on("renderSceneDirectory", (app, html) => {
@@ -512,7 +530,8 @@ function stateFromScene(scene) {
     biome: f.biome ?? null, size: preset, w, h,
     rolled: foundry.utils.deepClone(f.rolled ?? []),
     prompt: f.prompt ?? "", promptEdited: true,
-    model: f.model ?? game.settings.get(MOD, "model"),
+    // A map forged with FLUX reforges with the default model, not FLUX again.
+    model: L.isTopDown(f.model) ? f.model : game.settings.get(MOD, "model"),
     sceneName: scene.name, targetSceneId: scene.id, replace: true
   };
 }

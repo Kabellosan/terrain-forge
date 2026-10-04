@@ -11,12 +11,19 @@ export const SIZE_PRESETS = {
 
 // Picked from a side-by-side test (2026-09-29): GPT Image 1.5 and Nano Banana 2
 // keep the camera truly straight down; FLUX.2 tends to tilt trunks and statues.
+export const DEFAULT_MODEL = "fal-ai/gpt-image-1.5";
+
 export const MODELS = {
   "fal-ai/gpt-image-1.5": "GPT Image 1.5 — true top-down, clean and literal (~5¢)",
   "fal-ai/nano-banana-2": "Nano Banana 2 — true top-down, richest detail (~12¢)",
   "fal-ai/flux-2/flash": "FLUX.2 flash — cheapest (~2¢), camera may tilt",
   "fal-ai/flux-2-pro": "FLUX.2 pro (~8¢), camera may tilt"
 };
+
+/** GPT Image and Nano Banana paint truly top-down; FLUX tilts the camera. */
+export function isTopDown(model) {
+  return typeof model === "string" && (model.includes("gpt-image") || model.includes("nano-banana"));
+}
 
 // Shapes the non-FLUX models accept instead of pixel sizes.
 const NANO_RATIOS = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"];
